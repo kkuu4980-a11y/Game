@@ -3,88 +3,191 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>霓虹切分音：數位武士</title>
+    <title>虛擬邊界：意識上傳</title>
     <style>
-        :root {
-            --neon-blue: #00f2ff;
-            --neon-pink: #ff00ff;
+        :root { 
+            --neon-blue: #00f2ff; 
+            --neon-red: #ff3333; 
+            --neon-green: #39ff14;
+            --neon-purple: #bc13fe;
+            --neon-gold: #ffcc00;
             --bg-dark: #050505;
+            --panel-bg: rgba(15, 15, 15, 0.98);
         }
-        body {
-            margin: 0; padding: 0; overflow: hidden;
-            background-color: var(--bg-dark);
-            color: white;
-            font-family: 'PingFang TC', sans-serif;
-            touch-action: none;
-        }
+        body { margin: 0; background: var(--bg-dark); color: white; font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
 
-        #ui-layer {
+        /* 初始選單畫面 */
+        #menu-screen, #death-screen {
             position: absolute; inset: 0;
-            pointer-events: none;
-            display: flex; flex-direction: column;
-            justify-content: space-between;
-            padding: 20px;
+            display: flex; justify-content: center; align-items: center;
+            background: radial-gradient(circle at center, #1a1a2e 0%, #050505 100%);
+            z-index: 100;
         }
+        #death-screen { display: none; background: rgba(20, 0, 0, 0.9); z-index: 110; }
 
-        .header { display: flex; justify-content: space-between; font-size: 1.2rem; }
-        .combo-meter {
-            position: absolute; top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 5rem; font-weight: 900;
-            opacity: 0.1; transition: 0.1s;
+        .main-card {
+            background: var(--panel-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 50px 30px;
+            width: 85%;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
         }
+        .title { font-size: 2.5rem; font-weight: bold; margin-bottom: 10px; letter-spacing: 4px; color: white; }
+        .death-title { color: var(--neon-red); font-size: 3rem; margin-bottom: 20px; text-shadow: 0 0 20px var(--neon-red); }
+        .subtitle { color: #888; font-size: 0.9rem; line-height: 1.6; margin-bottom: 35px; }
+        
+        .input-group { text-align: left; margin-bottom: 25px; }
+        .input-label { font-size: 0.75rem; color: #666; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; display: block; }
+        #player-name-input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 15px;
+            color: white;
+            font-size: 1.1rem;
+            text-align: center;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        #player-name-input:focus { border-color: var(--neon-blue); }
 
-        #start-screen, #game-over {
-            position: absolute; inset: 0;
-            background: rgba(0,0,0,0.9);
-            display: flex; flex-direction: column;
-            justify-content: center; align-items: center;
-            z-index: 100; pointer-events: auto;
+        .start-btn {
+            width: 100%;
+            background: white;
+            color: black;
+            border: none;
+            border-radius: 12px;
+            padding: 18px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex; justify-content: center; align-items: center; gap: 10px;
+            transition: transform 0.1s, opacity 0.2s;
         }
+        .start-btn:active { transform: scale(0.96); opacity: 0.8; }
+        .retry-btn { background: var(--neon-red); color: white; margin-top: 20px; }
 
-        .btn-start {
-            background: transparent; color: var(--neon-blue);
-            border: 2px solid var(--neon-blue);
-            padding: 15px 40px; font-size: 1.5rem;
-            cursor: pointer; transition: 0.3s;
-            box-shadow: 0 0 15px var(--neon-blue);
-        }
-        .btn-start:hover { background: var(--neon-blue); color: black; }
+        /* 遊戲 UI 層級 */
+        #game-ui { position: absolute; inset: 0; pointer-events: none; z-index: 10; display: none; }
+        .stats-top { position: absolute; top: 20px; left: 20px; width: 220px; }
+        .bar-label { font-size: 10px; margin-bottom: 4px; color: #aaa; display: flex; justify-content: space-between; text-transform: uppercase; letter-spacing: 1px; }
+        .bar-container { width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; margin-bottom: 12px; overflow: hidden; position: relative; }
+        #hp-bar { height: 100%; background: var(--neon-red); width: 100%; transition: width 0.3s; box-shadow: 0 0 10px var(--neon-red); }
+        #exp-bar { height: 100%; background: var(--neon-green); width: 0%; transition: width 0.3s; box-shadow: 0 0 10px var(--neon-green); }
 
-        @keyframes slash-anim {
-            0% { transform: scaleX(0); opacity: 1; }
-            100% { transform: scaleX(1); opacity: 0; }
+        /* 對話系統 */
+        #dialog-box {
+            position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+            width: 90%; max-width: 550px;
+            background: var(--panel-bg); border: 1px solid #333;
+            padding: 25px; border-radius: 16px; display: none; pointer-events: auto;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            border-left: 4px solid var(--neon-blue);
         }
-        .slash-effect {
-            position: absolute; height: 4px; background: white;
-            box-shadow: 0 0 10px white, 0 0 20px var(--neon-pink);
-            pointer-events: none; transform-origin: left center;
-            animation: slash-anim 0.2s ease-out forwards;
+        #dialog-box.critical { border-left-color: var(--neon-red); animation: shake 0.5s infinite; }
+        @keyframes shake {
+            0% { transform: translate(-50%, 0); }
+            25% { transform: translate(-52%, 2px); }
+            50% { transform: translate(-48%, -2px); }
+            75% { transform: translate(-51%, 1px); }
+            100% { transform: translate(-50%, 0); }
+        }
+        #speaker { color: var(--neon-blue); font-size: 0.9rem; font-weight: bold; margin-bottom: 8px; text-transform: uppercase; }
+        #dialog-text { font-size: 1rem; line-height: 1.6; margin-bottom: 20px; color: #eee; }
+        .choice-btn {
+            display: block; width: 100%; padding: 14px; margin-top: 8px;
+            background: rgba(255,255,255,0.03); border: 1px solid #333;
+            color: white; border-radius: 10px; cursor: pointer; text-align: left;
+            font-size: 0.95rem; transition: 0.2s;
+        }
+        .choice-btn:hover { background: rgba(0, 242, 255, 0.1); border-color: var(--neon-blue); }
+
+        /* 升級選單 */
+        #upgrade-menu {
+            position: absolute; inset: 0; background: rgba(0,0,0,0.95);
+            display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 50; pointer-events: auto;
+        }
+        .upgrade-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); justify-content: center; max-width: 800px; gap: 15px; padding: 20px; width: 90%; }
+        .upgrade-card {
+            padding: 20px; border: 1px solid #333; border-radius: 16px;
+            background: #0a0a0a; text-align: center; cursor: pointer;
+            transition: 0.3s;
+        }
+        .upgrade-card:hover { border-color: var(--neon-blue); transform: translateY(-5px); background: #111; box-shadow: 0 5px 20px rgba(0,242,255,0.2); }
+        .upgrade-card h3 { color: var(--neon-blue); margin: 0 0 10px 0; font-size: 1rem; }
+        .upgrade-card p { color: #777; font-size: 0.8rem; margin: 0; line-height: 1.4; }
+
+        #boss-warning {
+            position: absolute; top: 30%; left: 0; width: 100%; text-align: center;
+            color: var(--neon-red); font-size: 3rem; font-weight: bold; letter-spacing: 10px;
+            display: none; pointer-events: none; z-index: 5; text-shadow: 0 0 20px var(--neon-red);
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.1); }
+            100% { opacity: 1; transform: scale(1); }
         }
     </style>
 </head>
 <body>
 
-    <div id="start-screen">
-        <h1 style="color: var(--neon-pink); font-size: 2.5rem; margin-bottom: 10px;">數位武士</h1>
-        <p style="opacity: 0.7; margin-bottom: 30px;">在敵人進入核心圈時點擊螢幕</p>
-        <button class="btn-start" onclick="startGame()">開始執行</button>
-    </div>
-
-    <div id="game-over" style="display: none;">
-        <h1 style="color: var(--danger);">系統崩潰</h1>
-        <p id="final-score"></p>
-        <button class="btn-start" onclick="location.reload()">重新啟動</button>
-    </div>
-
-    <div id="ui-layer">
-        <div class="header">
-            <div>同步率: <span id="sync-rate" style="color: var(--neon-blue);">0%</span></div>
-            <div>HP: <span id="hp" style="color: var(--neon-pink);">100</span></div>
+    <!-- 初始選單 -->
+    <div id="menu-screen">
+        <div class="main-card">
+            <div class="title">虛擬邊界</div>
+            <div class="subtitle">同步你的意識。自動掃描病毒碎片，強化核心演算法。在系統崩潰前，你能整合多少數據？</div>
+            
+            <div class="input-group">
+                <label class="input-label">Player ID</label>
+                <input type="text" id="player-name-input" maxlength="12" placeholder="使用者名稱" value="Player">
+            </div>
+            
+            <button class="start-btn" onclick="handleStartClick()">
+                <span>▶</span> 啟動核心
+            </button>
         </div>
-        <div id="combo-text" class="combo-meter">0</div>
-        <div style="text-align: center; opacity: 0.5; font-size: 0.8rem;">精準打擊以維持同步</div>
+    </div>
+
+    <!-- 死亡畫面 -->
+    <div id="death-screen">
+        <div class="main-card">
+            <div class="death-title">你死了</div>
+            <div class="subtitle" id="death-stats">核心已被格式化。<br>最終整合等級：LV.0</div>
+            <button class="start-btn retry-btn" onclick="location.reload()">
+                <span>↺</span> 重新啟動核心
+            </button>
+        </div>
+    </div>
+
+    <!-- 遊戲 UI -->
+    <div id="game-ui">
+        <div class="stats-top">
+            <div class="bar-label"><span>核心穩定度</span><span id="hp-val">100%</span></div>
+            <div class="bar-container"><div id="hp-bar"></div></div>
+            <div class="bar-label"><span>數據整合度</span><span id="lv-val">LV.1</span></div>
+            <div class="bar-container"><div id="exp-bar"></div></div>
+        </div>
+
+        <div id="dialog-box">
+            <div id="speaker">系統監測員</div>
+            <div id="dialog-text">正在嘗試建立虛擬鏈路...</div>
+            <div id="choice-container"></div>
+        </div>
+
+        <div id="upgrade-menu">
+            <h2 style="color: var(--neon-blue); margin-bottom: 5px;">↑ 核心進化</h2>
+            <p style="color: #666; margin-bottom: 25px;">選擇一個代碼片段進行重組</p>
+            <div id="upgrade-list" class="upgrade-grid"></div>
+        </div>
+
+        <div id="boss-warning">BOSS DETECTED</div>
     </div>
 
     <canvas id="gameCanvas"></canvas>
@@ -93,15 +196,36 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         
-        let gameState = 'START';
-        let score = 0;
-        let combo = 0;
-        let hp = 100;
-        let enemies = [];
-        let particles = [];
-        let spawnRate = 1500;
-        let lastSpawn = 0;
-        let coreRadius = 50;
+        const COLORS = {
+            blue: '#00f2ff',
+            red: '#ff3333',
+            green: '#39ff14',
+            purple: '#bc13fe',
+            gold: '#ffcc00',
+            bg: '#050505'
+        };
+
+        let gameState = 'MENU'; 
+        let playerName = "Player";
+        let hasLowBatteryWarning = false;
+        
+        let player = { 
+            x: 0, y: 0, size: 20, 
+            hp: 100, maxHp: 100, 
+            exp: 0, maxExp: 50, lv: 1, 
+            magnet: 80, speed: 4.5, 
+            fireRate: 35, 
+            multiShot: 1,
+            damage: 1,
+            shield: 0,
+            critChance: 0.05,
+            droneCount: 0,
+            teslaLevel: 0
+        };
+
+        let enemies = [], bullets = [], gems = [], effects = [], drones = [];
+        let frameCount = 0;
+        let isBossSpawned = false;
 
         function resize() {
             canvas.width = window.innerWidth;
@@ -110,167 +234,398 @@
         window.addEventListener('resize', resize);
         resize();
 
-        function startGame() {
-            document.getElementById('start-screen').style.display = 'none';
+        function handleStartClick() {
+            playerName = document.getElementById('player-name-input').value || "Player";
+            document.getElementById('menu-screen').style.display = 'none';
+            document.getElementById('game-ui').style.display = 'block';
+            startStory();
+        }
+
+        const storyFlow = {
+            start: {
+                text: `同步完成。識別碼：${playerName}。警告：防火牆已被攻破，檢測到大量『錯誤碼病毒』正在湧入。請盡可能收集數據碎片以進化核心。`,
+                choices: [{ text: "確認，進入戰鬥模式。", action: () => enterGame() }]
+            },
+            lowBattery: {
+                text: "糟糕，電量不足了！核心穩定度已降至臨界點。怎麼辦！！我的意識要消失了嗎？",
+                choices: [
+                    { text: "冷靜點，還有機會！", action: () => {
+                        document.getElementById('dialog-box').style.display = 'none';
+                        document.getElementById('dialog-box').classList.remove('critical');
+                        gameState = 'PLAYING';
+                        requestAnimationFrame(gameLoop);
+                    }}
+                ]
+            }
+        };
+
+        function startStory() {
+            gameState = 'STORY';
+            showDialog('start');
+        }
+
+        function showDialog(id) {
+            const data = storyFlow[id];
+            const box = document.getElementById('dialog-box');
+            box.style.display = 'block';
+            if(id === 'lowBattery') box.classList.add('critical');
+            
+            document.getElementById('dialog-text').innerText = data.text;
+            const container = document.getElementById('choice-container');
+            container.innerHTML = '';
+            
+            data.choices.forEach(c => {
+                const btn = document.createElement('button');
+                btn.className = 'choice-btn';
+                btn.innerText = c.text;
+                btn.onclick = () => { if (c.action) c.action(); };
+                container.appendChild(btn);
+            });
+        }
+
+        function enterGame() {
+            document.getElementById('dialog-box').style.display = 'none';
             gameState = 'PLAYING';
+            player.x = canvas.width / 2;
+            player.y = canvas.height / 2;
             requestAnimationFrame(gameLoop);
         }
 
-        window.addEventListener('mousedown', (e) => handleInput(e.clientX, e.clientY));
-        window.addEventListener('touchstart', (e) => {
-            handleInput(e.touches[0].clientX, e.touches[0].clientY);
-            e.preventDefault();
-        });
+        function gameOver() {
+            gameState = 'GAMEOVER';
+            document.getElementById('death-screen').style.display = 'flex';
+            document.getElementById('death-stats').innerHTML = `核心已被格式化。<br>最終整合等級：LV.${player.lv}`;
+        }
 
-        function handleInput(tx, ty) {
+        const moveHandler = (e) => {
             if (gameState !== 'PLAYING') return;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            player.targetX = clientX;
+            player.targetY = clientY;
+        };
+        window.addEventListener('mousemove', moveHandler);
+        window.addEventListener('touchmove', moveHandler, { passive: false });
 
-            createSlash(tx, ty);
-            let hit = false;
-            
-            // 檢查是否擊中靠近核心的敵人
-            for (let i = enemies.length - 1; i >= 0; i--) {
-                const en = enemies[i];
-                const dist = Math.sqrt((en.x - canvas.width/2)**2 + (en.y - canvas.height/2)**2);
-                
-                // 擊中判定範圍 (在核心圈附近)
-                if (dist < 120 && dist > 30) {
-                    enemies.splice(i, 1);
-                    hit = true;
-                    score += 10 + combo;
-                    combo++;
-                    createExplosion(en.x, en.y, varColor());
-                    break;
-                }
-            }
-
-            if (!hit) {
-                combo = 0;
-                hp -= 2;
-            }
-            updateUI();
-        }
-
-        function createSlash(tx, ty) {
-            const el = document.createElement('div');
-            el.className = 'slash-effect';
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2;
-            const angle = Math.atan2(ty - centerY, tx - centerX);
-            const dist = 200;
-            
-            el.style.left = centerX + 'px';
-            el.style.top = centerY + 'px';
-            el.style.width = dist + 'px';
-            el.style.transform = `rotate(${angle}刻)`; // 其實是用 rad
-            el.style.transform = `rotate(${angle}rad)`;
-            
-            document.body.appendChild(el);
-            setTimeout(() => el.remove(), 200);
-        }
-
-        function createExplosion(x, y, color) {
-            for (let i = 0; i < 8; i++) {
-                particles.push({
+        function createExplosion(x, y, color, count = 10) {
+            for(let i=0; i<count; i++) {
+                effects.push({
                     x, y,
-                    vx: (Math.random() - 0.5) * 10,
-                    vy: (Math.random() - 0.5) * 10,
-                    life: 1.0,
-                    color: color
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 0.5) * 8,
+                    life: 30,
+                    size: Math.random() * 4,
+                    color
                 });
             }
         }
 
-        function varColor() {
-            return Math.random() > 0.5 ? '#00f2ff' : '#ff00ff';
+        function gameLoop() {
+            if (gameState !== 'PLAYING') return;
+            frameCount++;
+
+            if (player.targetX !== undefined) {
+                player.x += (player.targetX - player.x) * 0.15;
+                player.y += (player.targetY - player.y) * 0.15;
+            }
+
+            // 生成怪物
+            if (!isBossSpawned) {
+                if (player.lv > 0 && player.lv % 10 === 0) {
+                    spawnBoss();
+                } else {
+                    let spawnRate = Math.max(8, 45 - player.lv);
+                    if (frameCount % spawnRate === 0 && enemies.length < 80) {
+                        spawnEnemy();
+                    }
+                }
+            }
+
+            // 特殊武器邏輯
+            if (player.teslaLevel > 0 && frameCount % 60 === 0) {
+                const target = enemies.find(e => Math.hypot(e.x - player.x, e.y - player.y) < 200);
+                if (target) {
+                    target.hp -= player.damage * 2 * player.teslaLevel;
+                    createExplosion(target.x, target.y, COLORS.blue, 5);
+                }
+            }
+
+            // 自動射擊
+            if (frameCount % player.fireRate === 0 && enemies.length > 0) {
+                fireAtClosest();
+                drones.forEach(d => fireAtClosest(d));
+            }
+
+            updateEntities();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function fireAtClosest(origin = player) {
+            let closest = null;
+            let minDist = Infinity;
+            enemies.forEach(e => {
+                const d = Math.hypot(e.x - origin.x, e.y - origin.y);
+                if (d < minDist) { minDist = d; closest = e; }
+            });
+            if (closest) {
+                const baseAngle = Math.atan2(closest.y - origin.y, closest.x - origin.x);
+                const count = origin === player ? player.multiShot : 1;
+                for(let i=0; i<count; i++) {
+                    const angleOffset = (i - (count-1)/2) * 0.2;
+                    const finalAngle = baseAngle + angleOffset;
+                    bullets.push({ 
+                        x: origin.x, y: origin.y, 
+                        vx: Math.cos(finalAngle) * 11, vy: Math.sin(finalAngle) * 11,
+                        dmg: player.damage,
+                        isCrit: Math.random() < player.critChance,
+                        life: 100
+                    });
+                }
+            }
         }
 
         function spawnEnemy() {
-            const angle = Math.random() * Math.PI * 2;
-            const dist = Math.max(canvas.width, canvas.height) * 0.6;
+            const side = Math.floor(Math.random() * 4);
+            let ex, ey;
+            const padding = 50;
+            if(side===0){ ex=Math.random()*canvas.width; ey=-padding; }
+            else if(side===1){ ex=canvas.width+padding; ey=Math.random()*canvas.height; }
+            else if(side===2){ ex=Math.random()*canvas.width; ey=canvas.height+padding; }
+            else { ex=-padding; ey=Math.random()*canvas.height; }
+
+            const isAdvanced = player.lv > 5 && Math.random() > 0.85;
+            const isHard = player.lv > 15 && Math.random() > 0.9;
+            
+            let color = COLORS.red;
+            if (isAdvanced) color = COLORS.purple;
+            if (isHard) color = COLORS.gold;
+
             enemies.push({
-                x: canvas.width/2 + Math.cos(angle) * dist,
-                y: canvas.height/2 + Math.sin(angle) * dist,
-                speed: 2 + (score / 500),
-                size: 20
+                x: ex, y: ey,
+                hp: (isHard ? 25 : (isAdvanced ? 12 : 2)) + Math.floor(player.lv/2),
+                maxHp: (isHard ? 25 : (isAdvanced ? 12 : 2)) + Math.floor(player.lv/2),
+                speed: (isHard ? 3 : (isAdvanced ? 2.2 : 1.3)) + Math.random(),
+                size: isHard ? 30 : (isAdvanced ? 24 : 18),
+                color: color,
+                dmg: isHard ? 2.5 : (isAdvanced ? 1.5 : 0.4),
+                isBoss: false
+            });
+        }
+
+        function spawnBoss() {
+            isBossSpawned = true;
+            enemies = [];
+            const warning = document.getElementById('boss-warning');
+            warning.style.display = 'block';
+            setTimeout(() => warning.style.display = 'none', 3000);
+
+            enemies.push({
+                x: canvas.width/2, y: -100,
+                hp: 180 * (player.lv / 10),
+                maxHp: 180 * (player.lv / 10),
+                speed: 1.0,
+                size: 90,
+                color: COLORS.red,
+                dmg: 4,
+                isBoss: true
+            });
+        }
+
+        function updateEntities() {
+            if (player.hp < 25 && !hasLowBatteryWarning) {
+                hasLowBatteryWarning = true;
+                gameState = 'STORY';
+                showDialog('lowBattery');
+                return;
+            }
+            if (player.hp >= 25) hasLowBatteryWarning = false;
+
+            // 粒子效果
+            effects.forEach((eff, i) => {
+                eff.x += eff.vx; eff.y += eff.vy; eff.life--;
+                if(eff.life <= 0) effects.splice(i, 1);
+            });
+
+            // 無人機位置
+            drones = [];
+            for(let i=0; i<player.droneCount; i++) {
+                const angle = (frameCount * 0.05) + (i * Math.PI * 2 / player.droneCount);
+                drones.push({
+                    x: player.x + Math.cos(angle) * 60,
+                    y: player.y + Math.sin(angle) * 60
+                });
+            }
+
+            // 敵人
+            enemies.forEach((e, ei) => {
+                const angle = Math.atan2(player.y - e.y, player.x - e.x);
+                e.x += Math.cos(angle) * e.speed;
+                e.y += Math.sin(angle) * e.speed;
+
+                if (Math.hypot(player.x - e.x, player.y - e.y) < (e.size/2 + 10)) {
+                    if (player.shield > 0) player.shield -= 0.2;
+                    else player.hp -= e.dmg * 0.5;
+                    updateUI();
+                    if (player.hp <= 0) gameOver();
+                }
+            });
+
+            // 子彈
+            bullets.forEach((b, bi) => {
+                b.x += b.vx; b.y += b.vy; b.life--;
+                if (b.life <= 0) { bullets.splice(bi, 1); return; }
+                
+                enemies.forEach((e, ei) => {
+                    if (Math.hypot(b.x - e.x, b.y - e.y) < e.size) {
+                        let actualDmg = b.dmg;
+                        if(b.isCrit) actualDmg *= 2;
+                        
+                        e.hp -= actualDmg;
+                        createExplosion(b.x, b.y, b.isCrit ? COLORS.green : COLORS.blue, 3);
+                        bullets.splice(bi, 1);
+                        
+                        if (e.hp <= 0) {
+                            createExplosion(e.x, e.y, e.color, 15);
+                            if (e.isBoss) {
+                                isBossSpawned = false;
+                                for(let i=0; i<15; i++) gems.push({ x: e.x + Math.random()*60-30, y: e.y + Math.random()*60-30, val: 60 });
+                            } else {
+                                gems.push({ x: e.x, y: e.y, val: 20 });
+                            }
+                            enemies.splice(ei, 1);
+                        }
+                    }
+                });
+            });
+
+            // 經驗收集
+            gems.forEach((g, gi) => {
+                const d = Math.hypot(player.x - g.x, player.y - g.y);
+                if (d < player.magnet) {
+                    g.x += (player.x - g.x) * 0.2;
+                    g.y += (player.y - g.y) * 0.2;
+                }
+                if (d < 15) {
+                    gems.splice(gi, 1);
+                    player.exp += g.val;
+                    if (player.exp >= player.maxExp) levelUp();
+                    updateUI();
+                }
+            });
+        }
+
+        function levelUp() {
+            player.lv++;
+            player.exp = 0;
+            player.maxExp *= 1.3;
+            gameState = 'UPGRADE';
+            
+            const list = document.getElementById('upgrade-list');
+            list.innerHTML = '';
+            document.getElementById('upgrade-menu').style.display = 'flex';
+
+            const pool = [
+                { t: "引力模組", d: "提升數據拾取範圍 +40%", e: () => player.magnet *= 1.4 },
+                { t: "超頻連發", d: "發射速率提升 20%", e: () => player.fireRate = Math.max(6, player.fireRate * 0.8) },
+                { t: "數據修復", d: "修復核心穩定度 50%", e: () => player.hp = Math.min(player.maxHp, player.hp + 50) },
+                { t: "多重射擊", d: "主核心彈數 +1", e: () => player.multiShot++ },
+                { t: "威力強化", d: "所有子彈傷害提升 60%", e: () => player.damage *= 1.6 },
+                { t: "防禦力場", d: "獲得強力數據護盾", e: () => player.shield = 150 },
+                { t: "暴擊演算法", d: "提升 20% 暴擊機率", e: () => player.critChance += 0.2 },
+                { t: "數據無人機", d: "召喚一台自動射擊的無人機", e: () => player.droneCount++ },
+                { t: "靜電脈衝", d: "自動電擊附近病毒", e: () => player.teslaLevel++ },
+                { t: "光譜推進", d: "永久提升移動速度", e: () => player.speed *= 1.25 },
+                { t: "雙重核心", d: "提升穩定度上限至 150%", e: () => { player.maxHp = 150; player.hp = 150; } }
+            ];
+
+            const shuffled = pool.sort(() => 0.5 - Math.random()).slice(0, 4);
+
+            shuffled.forEach(up => {
+                const card = document.createElement('div');
+                card.className = 'upgrade-card';
+                card.innerHTML = `<h3>${up.t}</h3><p>${up.d}</p>`;
+                card.onclick = () => {
+                    up.e();
+                    document.getElementById('upgrade-menu').style.display = 'none';
+                    gameState = 'PLAYING';
+                    updateUI();
+                    requestAnimationFrame(gameLoop);
+                };
+                list.appendChild(card);
             });
         }
 
         function updateUI() {
-            document.getElementById('sync-rate').innerText = score;
-            document.getElementById('hp').innerText = hp;
-            const ct = document.getElementById('combo-text');
-            ct.innerText = combo;
-            ct.style.opacity = Math.min(0.5, combo / 20);
-            
-            if (hp <= 0) {
-                gameState = 'OVER';
-                document.getElementById('game-over').style.display = 'flex';
-                document.getElementById('final-score').innerText = `最終同步率: ${score}`;
-            }
+            document.getElementById('hp-bar').style.width = (player.hp / player.maxHp * 100) + '%';
+            document.getElementById('hp-val').innerText = Math.ceil(player.hp) + '%';
+            document.getElementById('exp-bar').style.width = Math.min(100, (player.exp / player.maxExp * 100)) + '%';
+            document.getElementById('lv-val').innerText = 'LV.' + player.lv;
         }
 
-        function gameLoop(time) {
-            if (gameState !== 'PLAYING') return;
-
-            if (time - lastSpawn > spawnRate) {
-                spawnEnemy();
-                lastSpawn = time;
-                spawnRate = Math.max(400, 1500 - (score / 10));
-            }
-
-            ctx.fillStyle = 'rgba(5, 5, 5, 0.3)';
+        function draw() {
+            ctx.fillStyle = COLORS.bg;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // 繪製中心核心
-            ctx.strokeStyle = combo > 10 ? varColor() : '#333';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.arc(canvas.width/2, canvas.height/2, coreRadius, 0, Math.PI * 2);
-            ctx.stroke();
+            // 網格效果
+            ctx.strokeStyle = '#111';
+            ctx.lineWidth = 1;
+            for(let i=0; i<canvas.width; i+=50) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke(); }
+            for(let j=0; j<canvas.height; j+=50) { ctx.beginPath(); ctx.moveTo(0, j); ctx.lineTo(canvas.width, j); ctx.stroke(); }
 
-            // 繪製打擊判定圈 (提示玩家在哪裡點擊)
-            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-            ctx.beginPath();
-            ctx.arc(canvas.width/2, canvas.height/2, 100, 0, Math.PI * 2);
-            ctx.stroke();
-
-            // 更新並繪製敵人
-            ctx.fillStyle = varColor();
-            for (let i = enemies.length - 1; i >= 0; i--) {
-                const en = enemies[i];
-                const dx = canvas.width/2 - en.x;
-                const dy = canvas.height/2 - en.y;
-                const dist = Math.sqrt(dx*dx + dy*dy);
-                
-                en.x += (dx / dist) * en.speed;
-                en.y += (dy / dist) * en.speed;
-
-                ctx.fillRect(en.x - 10, en.y - 10, 20, 20);
-
-                if (dist < coreRadius) {
-                    enemies.splice(i, 1);
-                    hp -= 10;
-                    combo = 0;
-                    updateUI();
-                }
-            }
-
-            // 更新粒子
-            for (let i = particles.length - 1; i >= 0; i--) {
-                const p = particles[i];
-                p.x += p.vx;
-                p.y += p.vy;
-                p.life -= 0.02;
-                ctx.fillStyle = p.color;
-                ctx.globalAlpha = p.life;
-                ctx.fillRect(p.x, p.y, 4, 4);
-                if (p.life <= 0) particles.splice(i, 1);
-            }
+            // 粒子
+            effects.forEach(eff => {
+                ctx.fillStyle = eff.color;
+                ctx.globalAlpha = eff.life / 30;
+                ctx.fillRect(eff.x, eff.y, eff.size, eff.size);
+            });
             ctx.globalAlpha = 1.0;
 
-            requestAnimationFrame(gameLoop);
+            // 玩家
+            ctx.shadowBlur = 15; ctx.shadowColor = COLORS.blue;
+            ctx.fillStyle = 'white';
+            ctx.fillRect(player.x - 10, player.y - 10, 20, 20);
+
+            // 無人機
+            drones.forEach(d => {
+                ctx.shadowColor = COLORS.gold; ctx.fillStyle = COLORS.gold;
+                ctx.fillRect(d.x - 5, d.y - 5, 10, 10);
+            });
+
+            // 護盾
+            if (player.shield > 0) {
+                ctx.strokeStyle = COLORS.blue;
+                ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(player.x, player.y, 28, 0, Math.PI*2); ctx.stroke();
+            }
+
+            // 敵人
+            enemies.forEach(e => {
+                ctx.shadowColor = e.color; ctx.fillStyle = e.color;
+                ctx.fillRect(e.x - e.size/2, e.y - e.size/2, e.size, e.size);
+                if(e.isBoss) {
+                    ctx.fillStyle = '#222';
+                    ctx.fillRect(e.x - 50, e.y - 70, 100, 8);
+                    ctx.fillStyle = COLORS.red;
+                    ctx.fillRect(e.x - 50, e.y - 70, 100 * (e.hp/e.maxHp), 8);
+                }
+            });
+
+            // 子彈
+            bullets.forEach(b => { 
+                ctx.shadowColor = b.isCrit ? COLORS.green : COLORS.blue;
+                ctx.fillStyle = b.isCrit ? COLORS.green : COLORS.blue;
+                ctx.beginPath(); ctx.arc(b.x, b.y, b.isCrit ? 6 : 4, 0, Math.PI*2); ctx.fill(); 
+            });
+
+            // 碎片
+            ctx.shadowColor = COLORS.green; ctx.fillStyle = COLORS.green;
+            gems.forEach(g => ctx.fillRect(g.x - 4, g.y - 4, 8, 8));
+
+            ctx.shadowBlur = 0;
         }
+
+        window.onload = resize;
     </script>
 </body>
 </html>
