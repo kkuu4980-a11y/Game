@@ -2,187 +2,139 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>數位武士：遊戲入口網</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Html小遊戲天堂</title>
     <style>
-        :root {
-            --neon-blue: #00f2ff;
-            --neon-pink: #ff00ff;
-            --bg-dark: #0a0a12;
-            --card-bg: rgba(255, 255, 255, 0.05);
-        }
-
-        * {
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-        }
-
         body {
+            background-color: #0d1117;
+            color: #ffffff;
+            font-family: "Microsoft JhengHei", sans-serif;
+            text-align: center;
             margin: 0;
-            padding: 0;
-            background-color: var(--bg-dark);
-            color: white;
-            font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            overflow-x: hidden;
+            padding: 50px 20px;
         }
 
-        /* 掃描線背景效果 */
-        body::before {
-            content: "";
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%),
-                        linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
-            background-size: 100% 4px, 3px 100%;
-            pointer-events: none;
-            z-index: 10;
-        }
+        h1 { font-size: 2.5em; margin-bottom: 10px; }
+        h2 { margin-top: 40px; color: #f0f6fc; }
+        p { color: #8b949e; line-height: 1.6; }
 
         .container {
-            width: 100%;
             max-width: 800px;
-            padding: 40px 20px;
-            text-align: center;
-            z-index: 2;
+            margin: 0 auto;
         }
 
-        .title-section {
-            margin-bottom: 50px;
+        code {
+            background-color: #161b22;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #ff7b72;
         }
 
-        h1 {
-            font-size: 3rem;
-            margin: 0;
-            text-transform: uppercase;
-            letter-spacing: 5px;
-            color: white;
-            text-shadow: 0 0 10px var(--neon-blue), 0 0 20px var(--neon-blue);
+        #game-list {
+            margin: 30px 0;
+            padding: 20px;
+            background: #161b22;
+            border-radius: 8px;
+            border: 1px solid #30363d;
+            min-height: 50px;
         }
 
-        .subtitle {
-            color: var(--neon-pink);
-            font-size: 1.2rem;
-            margin-top: 10px;
-            letter-spacing: 2px;
-            opacity: 0.8;
-        }
-
-        .game-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 25px;
-            width: 100%;
-        }
-
-        @media (min-width: 600px) {
-            .game-grid {
-                grid-template-columns: 1fr 1fr;
-            }
-        }
-
-        .game-card {
-            background: var(--card-bg);
-            border: 1px solid rgba(0, 242, 255, 0.3);
-            border-radius: 15px;
-            padding: 30px;
+        .game-link {
+            color: #58a6ff;
             text-decoration: none;
-            color: white;
-            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            position: relative;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            font-family: monospace;
+            margin: 0 5px;
+            display: inline-block;
+            transition: color 0.2s;
         }
 
-        .game-card:hover {
-            transform: translateY(-10px) scale(1.02);
-            border-color: var(--neon-blue);
-            background: rgba(0, 242, 255, 0.1);
-            box-shadow: 0 0 30px rgba(0, 242, 255, 0.2);
-        }
-
-        .game-card.alt:hover {
-            border-color: var(--neon-pink);
-            background: rgba(255, 0, 255, 0.1);
-            box-shadow: 0 0 30px rgba(255, 0, 255, 0.2);
-        }
-
-        .icon {
-            font-size: 3.5rem;
-            margin-bottom: 20px;
-            filter: drop-shadow(0 0 10px rgba(255,255,255,0.5));
-        }
-
-        .game-name {
-            font-size: 1.5rem;
-            font-weight: bold;
-            margin-bottom: 10px;
-        }
-
-        .game-desc {
-            font-size: 0.9rem;
-            opacity: 0.6;
-            line-height: 1.5;
+        .game-link:hover {
+            color: #1f6feb;
+            text-decoration: underline;
         }
 
         .status-tag {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            font-size: 0.7rem;
-            padding: 3px 8px;
-            background: var(--neon-blue);
-            color: black;
             font-weight: bold;
-            border-radius: 4px;
-            text-transform: uppercase;
+            color: #3fb950;
+            margin-top: 20px;
+            display: block;
         }
 
-        .alt .status-tag {
-            background: var(--neon-pink);
-        }
-
-        /* 裝飾性裝甲線條 */
-        .corner {
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            border: 2px solid var(--neon-blue);
-        }
-        .top-left { top: 0; left: 0; border-right: none; border-bottom: none; }
-        .bottom-right { bottom: 0; right: 0; border-left: none; border-top: none; }
-
-        footer {
-            margin-top: auto;
-            padding: 30px;
-            font-size: 0.8rem;
-            opacity: 0.4;
-            letter-spacing: 1px;
+        .example-url {
+            color: #d2a8ff;
+            word-break: break-all;
         }
     </style>
 </head>
 <body>
 
-<h2>歡迎來到 Html小遊戲天堂</h2>
-    <p>在這裡你可以找到各種有趣的 HTML5 遊戲</p>
+    <div class="container">
+        <h1>歡迎來到 Html小遊戲天堂</h1>
+        <p>在這裡你可以找到各種有趣的 HTML5 遊戲</p>
 
-<div class="container"> </div>
+        <h2>如何遊玩？</h2>
+        <p>只需在網址後新增 <code>數字.html</code> 即可遊玩</p>
+        
+        <p>範例：<span class="example-url" id="example-link">https://game-kk.vercel.app/1.html</span></p>
 
-    <h2>如何遊玩?</h2>
-    <p>只需  在網址後新增數字.html即可遊玩</p>
-    <p>例如：<code>14.html</code>、<code>1.html</code>、<code>2.html</code>...</p>
-    <p>範例 : https://game-kk.vercel.app/1.html</p> 
-    <p>目前共有 14 款遊戲，未來會持續更新更多遊戲，敬請期待！</p>
-    <p>如果你超過14款遊戲 例如 : <code>15.html</code> 將會爆錯，因為沒有這個遊戲，每個遊戲就像在開彩蛋!</p>
+        <div id="game-list">
+            正在掃描遊戲庫...
+        </div>
 
-    <footer>
-        &copy; 2026 Html小遊戲天堂.
-    </footer>
+        <span class="status-tag" id="count-display">正在初始化...</span>
+        
+        <p style="font-size: 0.9em; margin-top: 50px;">
+            如果超過總數（例如：<code id="error-ex">15.html</code>）將會報錯，因為沒有這個遊戲，每個遊戲都像在開彩蛋！
+        </p>
+    </div>
 
+    <script>
+        async function autoUpdateGames() {
+            const countDisplay = document.getElementById('count-display');
+            const gameListDiv = document.getElementById('game-list');
+            const errorEx = document.getElementById('error-ex');
+            
+            let foundCount = 0;
+            let checkNext = true;
+            let i = 1; // 從 1.html 開始偵測
+
+            // 存儲找到的連結
+            let linksHtml = "快速遊玩：";
+
+            while (checkNext) {
+                try {
+                    // 使用 fetch 偵測檔案是否存在
+                    // 注意：這只會偵測 1.html, 2.html... 不會偵測到 index.html
+                    const response = await fetch(`${i}.html`, { method: 'HEAD' });
+                    
+                    if (response.ok) {
+                        foundCount = i;
+                        linksHtml += `<a class="game-link" href="${i}.html">${i}.html</a> `;
+                        i++;
+                    } else {
+                        checkNext = false;
+                    }
+                } catch (error) {
+                    checkNext = false;
+                }
+                
+                // 防止無限迴圈安全機制 (上限偵測到 200 款)
+                if (i > 200) break;
+            }
+
+            // 更新顯示文字
+            if (foundCount > 0) {
+                countDisplay.innerText = `目前共有 ${foundCount} 款遊戲，未來會持續更新更多遊戲，敬請期待！`;
+                gameListDiv.innerHTML = linksHtml;
+                errorEx.innerText = `${foundCount + 1}.html`;
+            } else {
+                countDisplay.innerText = `目前還沒有上傳遊戲，請將檔案命名為 1.html 上傳。`;
+                gameListDiv.innerHTML = "尚未發現遊戲檔案。";
+            }
+        }
+
+        // 執行偵測
+        autoUpdateGames();
+    </script>
 </body>
 </html>
