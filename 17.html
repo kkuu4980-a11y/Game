@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>極速點擊</title>
+    <style>
+        body {
+            background-color: #0d1117;
+            color: white;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        #game-wrapper {
+            position: relative;
+            width: 320px;
+            height: 480px;
+            background: #161b22;
+            border: 4px solid #30363d;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        #main {
+            position: absolute;
+            top: -120px; /* 隱藏上方緩衝區域 */
+            width: 100%;
+        }
+
+        .row {
+            display: flex;
+            width: 100%;
+            height: 120px;
+        }
+
+        .cell {
+            width: 80px;
+            height: 120px;
+            border: 1px solid #30363d;
+            box-sizing: border-box;
+        }
+
+        /* 黑塊樣式 */
+        .black {
+            background-color: #58a6ff; /* 使用你的主題藍色作為點擊目標 */
+            cursor: pointer;
+        }
+        
+        /* 點擊正確後的顏色 */
+        .clicked {
+            background-color: #21262d !important;
+        }
+
+        /* 點錯白塊的閃爍紅色 */
+        .error {
+            background-color: #ff7b72 !important;
+        }
+
+        #score-board {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: #58a6ff;
+            font-weight: bold;
+        }
+
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(13, 17, 23, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        button {
+            background-color: #238636;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 18px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:hover { background-color: #2ea043; }
+
+        .back-link {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #8b949e;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+
+    <a href="index.html" class="back-link">← 返回首頁</a>
+    <div id="score-board">分數: 0</div>
+
+    <div id="game-wrapper">
+        <div id="main"></div>
+        
+        <div id="overlay">
+            <h1 id="status-title">極速點擊</h1>
+            <p id="final-score"></p>
+            <button onclick="startGame()">開始遊戲</button>
+        </div>
+    </div>
+
+    <script>
+        const main = document.getElementById('main');
+        const scoreBoard = document.getElementById('score-board');
+        const overlay = document.getElementById('overlay');
+        const statusTitle = document.getElementById('status-title');
+        const finalScoreText = document.getElementById('final-score');
+        
+        let score = 0;
+        let speed = 4;
+        let timer = null;
+        let isOver = true;
+
+        // 初始化棋盤
+        function init() {
+            main.innerHTML = '';
+            for (let i = 0; i < 4; i++) {
+                addRow();
+            }
+        }
+
+        // 創建一行，並隨機指定一格為黑塊
+        function addRow() {
+            const row = document.createElement('div');
+            row.className = 'row';
+            const blackIndex = Math.floor(Math.random() * 4);
+
+            for (let i = 0; i < 4; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                if (i === blackIndex) {
+                    cell.classList.add('black');
+                }
+                row.appendChild(cell);
+            }
+
+            if (main.firstChild) {
+                main.insertBefore(row, main.firstChild);
+            } else {
+                main.appendChild(row);
+            }
+        }
+
+        // 移動邏輯
+        function move() {
+            const top = parseInt(window.getComputedStyle(main).top);
+            
+            // 如果 main 越過底線
+            if (top + speed > 0) {
+                main.style.top = '-120px';
+                
+                // 檢查最後一行是否有黑塊沒被點擊
+                const rows = main.childNodes;
+                const lastRow = rows[rows.length - 1];
+                for (let i = 0; i < 4; i++) {
+                    if (lastRow.childNodes[i].classList.contains('black') && 
+                        !lastRow.childNodes[i].classList.contains('clicked')) {
+                        gameOver();
+                        return;
+                    }
+                }
+
+                addRow();
+                main.removeChild(main.lastChild);
+            } else {
+                main.style.top = top + speed + 'px';
+            }
+        }
+
+        // 點擊事件處理
+        main.onclick = function (e) {
+            if (isOver) return;
+
+            const target = e.target;
+            if (target.classList.contains('black')) {
+                // 點對了
+                target.classList.remove('black');
+                target.classList.add('clicked');
+                score++;
+                scoreBoard.innerHTML = '分數: ' + score;
+                
+                // 階梯式增加難度
+                if (score % 10 === 0) {
+                    speed += 0.5;
+                }
+            } else {
+                // 點錯了
+                target.classList.add('error');
+                gameOver();
+            }
+        };
+
+        function startGame() {
+            score = 0;
+            speed = 4;
+            isOver = false;
+            scoreBoard.innerHTML = '分數: 0';
+            overlay.style.display = 'none';
+            main.style.top = '-120px';
+            init();
+            
+            if (timer) clearInterval(timer);
+            timer = setInterval(move, 20);
+        }
+
+        function gameOver() {
+            isOver = true;
+            clearInterval(timer);
+            statusTitle.innerText = "遊戲結束";
+            statusTitle.style.color = "#ff7b72";
+            finalScoreText.innerText = "最終分數: " + score;
+            overlay.style.display = 'flex';
+        }
+
+        init();
+    </script>
+</body>
+</html>

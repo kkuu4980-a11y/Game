@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>星際守衛 - Star Defender</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #0b0e14;
+            color: #58a6ff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        #game-info {
+            position: absolute;
+            top: 20px;
+            display: flex;
+            justify-content: space-between;
+            width: 90%;
+            max-width: 400px;
+            font-size: 20px;
+            font-weight: bold;
+            z-index: 10;
+        }
+
+        canvas {
+            display: block;
+            background: radial-gradient(circle, #161b22 0%, #0b0e14 100%);
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            cursor: crosshair;
+        }
+
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(13, 17, 23, 0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+        }
+
+        h1 { font-size: 40px; margin-bottom: 10px; color: #f0f6fc; }
+        p { color: #8b949e; margin-bottom: 30px; }
+
+        button {
+            background-color: transparent;
+            color: #58a6ff;
+            border: 2px solid #58a6ff;
+            padding: 12px 40px;
+            font-size: 18px;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background-color: #58a6ff;
+            color: #0d1117;
+        }
+
+        .back-link {
+            position: absolute;
+            bottom: 20px;
+            color: #8b949e;
+            text-decoration: none;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-info">
+        <div>SCORE: <span id="score">0</span></div>
+        <div>HP: <span id="hp">3</span></div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="overlay">
+        <h1 id="msg-title">STAR DEFENDER</h1>
+        <p id="msg-desc">點擊畫面射擊隕石，守護星系</p>
+        <button onclick="startGame()">START MISSION</button>
+    </div>
+
+    <a href="index.html" class="back-link">← 回到主選單</a>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const hpEl = document.getElementById('hp');
+        const overlay = document.getElementById('overlay');
+        const msgTitle = document.getElementById('msg-title');
+        const msgDesc = document.getElementById('msg-desc');
+
+        let score = 0;
+        let hp = 3;
+        let isPlaying = false;
+        let bullets = [];
+        let enemies = [];
+        let particles = [];
+        let spawnRate = 1000;
+        let lastSpawn = 0;
+
+        // 設定畫布大小
+        function resize() {
+            canvas.width = window.innerWidth > 500 ? 400 : window.innerWidth;
+            canvas.height = window.innerHeight > 700 ? 600 : window.innerHeight;
+        }
+        window.onresize = resize;
+        resize();
+
+        class Bullet {
+            constructor(x, y, targetX, targetY) {
+                this.x = x;
+                this.y = y;
+                const angle = Math.atan2(targetY - y, targetX - x);
+                this.vx = Math.cos(angle) * 7;
+                this.vy = Math.sin(angle) * 7;
+                this.radius = 3;
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#f2ce7e';
+                ctx.fill();
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+            }
+        }
+
+        class Enemy {
+            constructor() {
+                this.radius = Math.random() * 15 + 10;
+                this.x = Math.random() * (canvas.width - this.radius * 2) + this.radius;
+                this.y = -this.radius;
+                this.speed = Math.random() * 2 + 1 + (score / 100);
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.strokeStyle = '#ff7b72';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+            update() {
+                this.y += this.speed;
+            }
+        }
+
+        class Particle {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 4;
+                this.vy = (Math.random() - 0.5) * 4;
+                this.alpha = 1;
+            }
+            draw() {
+                ctx.globalAlpha = this.alpha;
+                ctx.fillStyle = '#ff7b72';
+                ctx.fillRect(this.x, this.y, 2, 2);
+                ctx.globalAlpha = 1;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.alpha -= 0.02;
+            }
+        }
+
+        function startGame() {
+            score = 0;
+            hp = 3;
+            bullets = [];
+            enemies = [];
+            particles = [];
+            isPlaying = true;
+            scoreEl.innerText = score;
+            hpEl.innerText = hp;
+            overlay.style.display = 'none';
+            animate();
+        }
+
+        function gameOver() {
+            isPlaying = false;
+            overlay.style.display = 'flex';
+            msgTitle.innerText = "MISSION FAILED";
+            msgDesc.innerText = `最終守護分數: ${score}`;
+        }
+
+        // 點擊射擊
+        canvas.addEventListener('mousedown', (e) => {
+            if (!isPlaying) return;
+            const rect = canvas.getBoundingClientRect();
+            bullets.push(new Bullet(canvas.width / 2, canvas.height - 20, e.clientX - rect.left, e.clientY - rect.top));
+        });
+
+        // 支援觸控
+        canvas.addEventListener('touchstart', (e) => {
+            if (!isPlaying) return;
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            bullets.push(new Bullet(canvas.width / 2, canvas.height - 20, e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top));
+        });
+
+        function animate(time = 0) {
+            if (!isPlaying) return;
+            requestAnimationFrame(animate);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 繪製砲塔位置
+            ctx.fillStyle = '#58a6ff';
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2, canvas.height, 30, Math.PI, 0);
+            ctx.fill();
+
+            // 生成敵人
+            if (time - lastSpawn > Math.max(300, spawnRate - score)) {
+                enemies.push(new Enemy());
+                lastSpawn = time;
+            }
+
+            // 更新子彈
+            bullets.forEach((b, bi) => {
+                b.update();
+                b.draw();
+                if (b.y < 0 || b.x < 0 || b.x > canvas.width) bullets.splice(bi, 1);
+            });
+
+            // 更新敵人
+            enemies.forEach((e, ei) => {
+                e.update();
+                e.draw();
+
+                // 敵人到底部
+                if (e.y > canvas.height) {
+                    enemies.splice(ei, 1);
+                    hp--;
+                    hpEl.innerText = hp;
+                    if (hp <= 0) gameOver();
+                }
+
+                // 子彈碰撞檢測
+                bullets.forEach((b, bi) => {
+                    const dist = Math.hypot(e.x - b.x, e.y - b.y);
+                    if (dist < e.radius) {
+                        // 爆炸效果
+                        for (let i = 0; i < 8; i++) particles.push(new Particle(e.x, e.y));
+                        enemies.splice(ei, 1);
+                        bullets.splice(bi, 1);
+                        score += 10;
+                        scoreEl.innerText = score;
+                    }
+                });
+            });
+
+            // 更新粒子
+            particles.forEach((p, pi) => {
+                p.update();
+                p.draw();
+                if (p.alpha <= 0) particles.splice(pi, 1);
+            });
+        }
+    </script>
+</body>
+</html>

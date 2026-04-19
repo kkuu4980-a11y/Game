@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>邏輯拼圖 2048</title>
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --text-color: #c9d1d9;
+            --grid-bg: #161b22;
+            --tile-text-dark: #f9f6f2;
+            --tile-text-light: #776e65;
+            /* 2048 各數字方塊顏色 (調整為深色模式配色的漸層) */
+            --tile-2: #21262d;
+            --tile-4: #30363d;
+            --tile-8: #f2b179;
+            --tile-16: #f59563;
+            --tile-32: #f67c5f;
+            --tile-64: #f65e3b;
+            --tile-128: #edcf72;
+            --tile-256: #edcc61;
+            --tile-512: #9b59b6; /* 512 之後開始變換顏色風格 */
+            --tile-1024: #3498db;
+            --tile-2048: #2ecc71;
+            --tile-super: #e74c3c;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: "Clear Sans", "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden; /* 防止手機模式捲動 */
+        }
+
+        #ui-container {
+            width: 320px;
+            max-width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        #back-btn {
+            background-color: #21262d;
+            color: #c9d1d9;
+            border: 1px solid #30363d;
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        #back-btn:hover {
+            background-color: #30363d;
+            border-color: #8b949e;
+        }
+
+        .scores-container {
+            display: flex;
+            gap: 10px;
+        }
+
+        .score-box {
+            background-color: var(--grid-bg);
+            padding: 5px 15px;
+            border-radius: 6px;
+            text-align: center;
+            border: 1px solid #30363d;
+        }
+
+        .score-title {
+            font-size: 10px;
+            color: #8b949e;
+            text-transform: uppercase;
+        }
+
+        .score-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #58a6ff;
+        }
+
+        /* 遊戲格線區域 */
+        #game-container {
+            position: relative;
+            padding: 10px;
+            cursor: default;
+            background: var(--grid-bg);
+            border-radius: 8px;
+            width: 300px;
+            height: 300px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: 10px;
+            border: 2px solid #30363d;
+            touch-action: none; /* 重要：禁用行動裝置的預設滑動行為 */
+        }
+
+        /* 遊戲遮罩 (開始/結束) */
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(13, 17, 23, 0.9);
+            border-radius: 6px;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        #overlay h1 {
+            color: #f0f6fc;
+            font-size: 3em;
+            margin: 0 0 10px 0;
+        }
+
+        #overlay p {
+            color: #8b949e;
+            margin-bottom: 20px;
+        }
+
+        #restart-btn {
+            background-color: #238636;
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            font-size: 18px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        #restart-btn:hover {
+            background-color: #2ea043;
+        }
+
+        /* 背景網格 (裝飾用) */
+        .grid-cell {
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+        }
+
+        /* 數字方塊 */
+        .tile {
+            position: absolute;
+            width: 65px; /* (300-10*3)/4 - 10px padding */
+            height: 65px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: bold;
+            transition: transform 0.1s ease-in-out, background-color 0.1s;
+            z-index: 2;
+        }
+
+        /* 數字對應的樣式 (CSS 變數) */
+        .tile-2 { background-color: var(--tile-2); color: var(--tile-text-dark); }
+        .tile-4 { background-color: var(--tile-4); color: var(--tile-text-dark); }
+        .tile-8 { background-color: var(--tile-8); color: var(--tile-text-dark); }
+        .tile-16 { background-color: var(--tile-16); color: var(--tile-text-dark); }
+        .tile-32 { background-color: var(--tile-32); color: var(--tile-text-dark); }
+        .tile-64 { background-color: var(--tile-64); color: var(--tile-text-dark); }
+        .tile-128 { background-color: var(--tile-128); color: var(--tile-text-dark); font-size: 28px; box-shadow: 0 0 10px var(--tile-128); }
+        .tile-256 { background-color: var(--tile-256); color: var(--tile-text-dark); font-size: 28px; box-shadow: 0 0 15px var(--tile-256); }
+        .tile-512 { background-color: var(--tile-512); color: var(--tile-text-dark); font-size: 28px; }
+        .tile-1024 { background-color: var(--tile-1024); color: var(--tile-text-dark); font-size: 24px; }
+        .tile-2048 { background-color: var(--tile-2048); color: var(--tile-text-dark); font-size: 24px; box-shadow: 0 0 20px rgba(46, 204, 113, 0.5); }
+        .tile-super { background-color: var(--tile-super); color: var(--tile-text-dark); font-size: 20px; }
+
+        /* 新生成/合併的動畫 */
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .tile-new {
+            animation: popIn 0.2s ease;
+        }
+        .tile-merged {
+            z-index: 3;
+            animation: popIn 0.1s ease reverse, popIn 0.1s ease 0.1s;
+        }
+
+        /* 說明文字 */
+        #instructions {
+            margin-top: 20px;
+            color: #8b949e;
+            font-size: 14px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-container">
+        <a href="index.html" id="back-btn">← 返回</a>
+        <div class="scores-container">
+            <div class="score-box">
+                <div class="score-title">SCORE</div>
+                <div class="score-value" id="score">0</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-container">
+        <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+        <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+        <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+        <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+        
+        <div id="tile-container"></div>
+
+        <div id="overlay">
+            <h1 id="status-text">2048</h1>
+            <p id="final-msg">挑戰邏輯極限！</p>
+            <button id="restart-btn">開始遊戲</button>
+        </div>
+    </div>
+
+    <div id="instructions">
+        使用方向鍵或 WASD 滑動方塊。
+    </div>
+
+    <script>
+        const gameContainer = document.getElementById('game-container');
+        const tileContainer = document.getElementById('tile-container');
+        const scoreElement = document.getElementById('score');
+        const overlay = document.getElementById('overlay');
+        const statusText = document.getElementById('status-text');
+        const finalMsg = document.getElementById('final-msg');
+        const restartBtn = document.getElementById('restart-btn');
+
+        let board = [];
+        let score = 0;
+        let isGameOver = false;
+        let hasWon = false;
+        const size = 4;
+        const TILE_SIZE = 65; // px
+        const GAP_SIZE = 10;   // px
+
+        // 初始化遊戲
+        function initGame() {
+            board = Array(size).fill(0).map(() => Array(size).fill(0));
+            score = 0;
+            isGameOver = false;
+            hasWon = false;
+            updateScore(0);
+            tileContainer.innerHTML = ''; // 清空方塊
+            overlay.style.display = 'none';
+            
+            // 初始生成兩個方塊
+            addRandomTile();
+            addRandomTile();
+            drawBoard();
+        }
+
+        // 更新分數
+        function updateScore(amount) {
+            score += amount;
+            scoreElement.innerText = score;
+        }
+
+        // 在隨機空白位置新增方塊 (2 或 4)
+        function addRandomTile() {
+            let emptyCells = [];
+            for (let r = 0; r < size; r++) {
+                for (let c = 0; c < size; c++) {
+                    if (board[r][c] === 0) {
+                        emptyCells.push({r, c});
+                    }
+                }
+            }
+            if (emptyCells.length > 0) {
+                let cell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                board[cell.r][cell.c] = Math.random() < 0.9 ? 2 : 4; // 90% 機率生成 2，10% 生成 4
+                
+                // 用於動畫標記
+                return cell;
+            }
+            return null;
+        }
+
+        // 計算方塊的 CSS 位置
+        function getPositionCss(row, col) {
+            const top = GAP_SIZE + row * (TILE_SIZE + GAP_SIZE);
+            const left = GAP_SIZE + col * (TILE_SIZE + GAP_SIZE);
+            return `transform: translate(${left}px, ${top}px);`;
+        }
+
+        // 繪製棋盤 (建立 DOM 元素)
+        function drawBoard() {
+            // 先找出原本存在的方塊 DOM
+            const existingTiles = Array.from(tileContainer.childNodes);
+            const newTileMap = new Map();
+
+            // 遍歷邏輯棋盤
+            for (let r = 0; r < size; r++) {
+                for (let c = 0; c < size; c++) {
+                    const value = board[r][c];
+                    if (value > 0) {
+                        // 建立或復用方塊 DOM
+                        const tileDiv = document.createElement('div');
+                        let tileClass = `tile tile-${value}`;
+                        if (value > 2048) tileClass = 'tile tile-super';
+                        
+                        tileDiv.className = tileClass;
+                        tileDiv.innerText = value;
+                        tileDiv.style.cssText = getPositionCss(r, c);
+                        
+                        tileContainer.appendChild(tileDiv);
+                    }
+                }
+            }
+            
+            // 清除舊的方塊 (這是一個簡化的繪製邏輯，為了確保沒有 bug)
+            // 真正的 2048 滑動動畫需要更複雜的 DOM 管理，這裡採用「重新繪製」法
+            // 但加上了 transform transition，看起來仍有移動效果
+            setTimeout(() => {
+                while(existingTiles.length > 0) {
+                    existingTiles.pop().remove();
+                }
+            }, 100); 
+        }
+
+        // --- 核心遊戲邏輯：移動與合併 ---
+
+        // 滑動並合併一行/一列
+        function slideAndMergeRow(row) {
+            // 1. 去除空白 (全部靠邊)
+            let arr = row.filter(val => val);
+            let missing = size - arr.length;
+            let zeros = Array(missing).fill(0);
+            arr = arr.concat(zeros); // 靠左滑動，空白補右邊
+
+            // 2. 合併相鄰且相同的數字
+            let pointsGained = 0;
+            for (let i = 0; i < size - 1; i++) {
+                if (arr[i] !== 0 && arr[i] === arr[i + 1]) {
+                    arr[i] = arr[i] * 2;
+                    pointsGained += arr[i];
+                    arr[i + 1] = 0;
+                    
+                    // 檢查勝利條件
+                    if (arr[i] === 2048 && !hasWon) hasWon = true;
+                }
+            }
+
+            // 3. 再次去除因合併產生的空白
+            arr = arr.filter(val => val);
+            missing = size - arr.length;
+            zeros = Array(missing).fill(0);
+            arr = arr.concat(zeros);
+
+            return { newRow: arr, points: pointsGained };
+        }
+
+        // 處理方向鍵輸入
+        function handleMove(direction) {
+            if (isGameOver) return;
+
+            let prevBoardStr = JSON.stringify(board);
+            let totalPointsGained = 0;
+
+            // 根據方向將 board 旋轉/轉置，統一轉化為「向左滑動」邏輯
+            if (direction === 'LEFT' || direction === 'RIGHT') {
+                for (let r = 0; r < size; r++) {
+                    let row = board[r];
+                    if (direction === 'RIGHT') row.reverse(); // 向右 = 反轉後向左
+                    
+                    let result = slideAndMergeRow(row);
+                    board[r] = result.newRow;
+                    if (direction === 'RIGHT') board[r].reverse(); // 向右 = 滑動後再反轉回來
+                    totalPointsGained += result.points;
+                }
+            } 
+            else if (direction === 'UP' || direction === 'DOWN') {
+                for (let c = 0; c < size; c++) {
+                    // 提取列
+                    let col = [board[0][c], board[1][c], board[2][c], board[3][c]];
+                    if (direction === 'DOWN') col.reverse(); // 向下 = 反轉後向左
+                    
+                    let result = slideAndMergeRow(col);
+                    let newCol = result.newRow;
+                    if (direction === 'DOWN') newCol.reverse();
+                    totalPointsGained += result.points;
+
+                    // 放回列
+                    for (let r = 0; r < size; r++) {
+                        board[r][c] = newCol[r];
+                    }
+                }
+            }
+
+            // 檢查棋盤是否有變動
+            if (prevBoardStr !== JSON.stringify(board)) {
+                updateScore(totalPointsGained);
+                addRandomTile();
+                drawBoard();
+                
+                // 檢查是否勝利
+                if (hasWon && statusText.innerText !== "你贏了！") {
+                    gameWin();
+                } else {
+                    checkGameOver();
+                }
+            }
+        }
+
+        // 檢查是否遊戲結束 (棋盤滿了且無法合併)
+        function checkGameOver() {
+            // 1. 檢查是否有空位
+            for (let r = 0; r < size; r++) {
+                for (let c = 0; c < size; c++) {
+                    if (board[r][c] === 0) return; // 還有空位，未結束
+                }
+            }
+            
+            // 2. 檢查是否能水平合併
+            for (let r = 0; r < size; r++) {
+                for (let c = 0; c < size - 1; c++) {
+                    if (board[r][c] === board[r][c+1]) return;
+                }
+            }
+
+            // 3. 檢查是否能垂直合併
+            for (let c = 0; c < size; c++) {
+                for (let r = 0; r < size - 1; r++) {
+                    if (board[r][c] === board[r+1][c]) return;
+                }
+            }
+
+            // 都沒有，遊戲結束
+            gameLoss();
+        }
+
+        // 遊戲狀態顯示
+        function gameWin() {
+            statusText.innerText = "你贏了！";
+            statusText.style.color = var(--tile-2048);
+            finalMsg.innerText = "成功拼出 2048！";
+            restartBtn.innerText = "繼續挑戰";
+            overlay.style.display = 'flex';
+        }
+
+        function gameLoss() {
+            isGameOver = true;
+            statusText.innerText = "遊戲結束";
+            statusText.style.color = "#ff7b72";
+            finalMsg.innerText = `最終分數: ${score}`;
+            restartBtn.innerText = "再試一次";
+            overlay.style.display = 'flex';
+        }
+
+        // --- 輸入控制 ---
+
+        // 鍵盤控制 (方向鍵 和 WASD)
+        document.addEventListener('keydown', e => {
+            const keyMap = {
+                'ArrowUp': 'UP', 'w': 'UP', 'W': 'UP',
+                'ArrowDown': 'DOWN', 's': 'DOWN', 'S': 'DOWN',
+                'ArrowLeft': 'LEFT', 'a': 'LEFT', 'A': 'LEFT',
+                'ArrowRight': 'RIGHT', 'd': 'RIGHT', 'D': 'RIGHT'
+            };
+            
+            if (keyMap[e.key]) {
+                e.preventDefault(); // 防止網頁捲動
+                handleMove(keyMap[e.key]);
+            }
+        });
+
+        // 觸控控制 (行動裝置滑動)
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        gameContainer.addEventListener('touchstart', e => {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        });
+
+        gameContainer.addEventListener('touchend', e => {
+            if (e.touches.length > 0) return; // 確保只有一根手指
+            
+            let dx = e.changedTouches[0].clientX - touchStartX;
+            let dy = e.changedTouches[0].clientY - touchStartY;
+            
+            const absDx = Math.abs(dx);
+            const absDy = Math.abs(dy);
+            const threshold = 50; // 滑動門檻 px
+
+            if (Math.max(absDx, absDy) > threshold) {
+                // 判斷是水平還是垂直滑動
+                if (absDx > absDy) {
+                    // 水平
+                    handleMove(dx > 0 ? 'RIGHT' : 'LEFT');
+                } else {
+                    // 垂直
+                    handleMove(dy > 0 ? 'DOWN' : 'UP');
+                }
+            }
+        });
+
+        // 重新開始按鈕
+        restartBtn.addEventListener('click', () => {
+            if (hasWon && !isGameOver) {
+                // 如果贏了按「繼續挑戰」，只關閉遮罩
+                overlay.style.display = 'none';
+            } else {
+                initGame();
+            }
+        });
+
+        // 初始載入
+        initGame();
+
+    </script>
+</body>
+</html>

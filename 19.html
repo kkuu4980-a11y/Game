@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>幾何衝刺 - Geometry Dodge</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #0d1117;
+            color: #ffffff;
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            text-align: center;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        #score-val {
+            font-size: 48px;
+            font-weight: bold;
+            opacity: 0.5;
+        }
+
+        canvas {
+            display: block;
+            background-color: #0d1117;
+        }
+
+        #overlay {
+            position: absolute;
+            background: rgba(13, 17, 23, 0.9);
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+        }
+
+        .btn {
+            background: none;
+            border: 2px solid #ffffff;
+            color: white;
+            padding: 10px 30px;
+            font-size: 18px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: 0.3s;
+        }
+
+        .btn:hover {
+            background: white;
+            color: #0d1117;
+        }
+
+        h1 { margin-bottom: 5px; }
+        p { margin-bottom: 25px; color: #8b949e; }
+
+        .back-home {
+            position: absolute;
+            bottom: 30px;
+            color: #58a6ff;
+            text-decoration: none;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <div id="score-val">0</div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="overlay">
+        <h1 id="title">GEOMETRY DODGE</h1>
+        <p id="desc">拖動方塊躲避紅色障礙</p>
+        <button class="btn" onclick="resetGame()">START</button>
+        <a href="index.html" class="back-home">← 返回選單</a>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score-val');
+        const overlay = document.getElementById('overlay');
+        const titleEl = document.getElementById('title');
+        const descEl = document.getElementById('desc');
+
+        let player = { x: 0, y: 0, size: 15 };
+        let obstacles = [];
+        let score = 0;
+        let isRunning = false;
+        let frame = 0;
+        let mouse = { x: 0, y: 0 };
+
+        function init() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            player.x = canvas.width / 2;
+            player.y = canvas.height / 2;
+            mouse.x = player.x;
+            mouse.y = player.y;
+        }
+
+        window.addEventListener('resize', init);
+        
+        // 滑鼠與觸控追蹤
+        const updateMouse = (e) => {
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            mouse.x = clientX;
+            mouse.y = clientY;
+        };
+
+        window.addEventListener('mousemove', updateMouse);
+        window.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            updateMouse(e);
+        }, { passive: false });
+
+        class Obstacle {
+            constructor() {
+                this.angle = Math.random() * Math.PI * 2;
+                this.distance = Math.max(canvas.width, canvas.height) / 2;
+                this.speed = 2 + (score / 20);
+                this.width = 40 + Math.random() * 60;
+                this.height = 15;
+                this.rotation = Math.random() * Math.PI * 2;
+                this.rotSpeed = (Math.random() - 0.5) * 0.05;
+            }
+
+            update() {
+                this.distance -= this.speed;
+                this.rotation += this.rotSpeed;
+                
+                // 算出當前位置
+                this.x = canvas.width / 2 + Math.cos(this.angle) * this.distance;
+                this.y = canvas.height / 2 + Math.sin(this.angle) * this.distance;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+                ctx.fillStyle = '#ff7b72';
+                ctx.fillRect(-this.width/2, -this.height/2, this.width, this.height);
+                ctx.restore();
+            }
+        }
+
+        function resetGame() {
+            score = 0;
+            obstacles = [];
+            isRunning = true;
+            scoreEl.innerText = score;
+            overlay.style.display = 'none';
+            init();
+            animate();
+        }
+
+        function gameOver() {
+            isRunning = false;
+            overlay.style.display = 'flex';
+            titleEl.innerText = "CRASHED!";
+            descEl.innerText = `生存得分: ${score}`;
+        }
+
+        function animate() {
+            if (!isRunning) return;
+            requestAnimationFrame(animate);
+            ctx.fillStyle = 'rgba(13, 17, 23, 0.2)'; // 拖尾效果
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 玩家平滑跟隨
+            player.x += (mouse.x - player.x) * 0.15;
+            player.y += (mouse.y - player.y) * 0.15;
+
+            // 畫玩家
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#ffffff';
+            ctx.fillRect(player.x - player.size/2, player.y - player.size/2, player.size, player.size);
+            ctx.shadowBlur = 0;
+
+            // 生成障礙物
+            frame++;
+            if (frame % Math.max(5, (30 - Math.floor(score/5))) === 0) {
+                obstacles.push(new Obstacle());
+            }
+
+            // 更新障礙物
+            obstacles.forEach((ob, index) => {
+                ob.update();
+                ob.draw();
+
+                // 碰撞檢測 (簡單圓形碰撞模擬矩形)
+                let dx = player.x - ob.x;
+                let dy = player.y - ob.y;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < 25) {
+                    gameOver();
+                }
+
+                // 移除跑進中心的障礙物並得分
+                if (ob.distance < 10) {
+                    obstacles.splice(index, 1);
+                    score++;
+                    scoreEl.innerText = score;
+                }
+            });
+        }
+
+        init();
+    </script>
+</body>
+</html>

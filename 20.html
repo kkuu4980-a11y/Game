@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>鏡像繪圖 - Mirror Draw</title>
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --grid-color: #161b22;
+            --ui-color: #21262d;
+            --text-color: #c9d1d9;
+            --accent-color: #58a6ff;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            touch-action: none; /* 重要：禁用行動裝置的預設滑動行為 */
+        }
+
+        #header {
+            width: 100%;
+            padding: 15px 20px;
+            background-color: var(--ui-color);
+            border-bottom: 1px solid #30363d;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+            z-index: 10;
+        }
+
+        #title-area {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #title-area h1 {
+            margin: 0;
+            font-size: 20px;
+            color: #f0f6fc;
+        }
+
+        #back-link {
+            color: #8b949e;
+            text-decoration: none;
+            font-size: 14px;
+            transition: color 0.2s;
+        }
+        #back-link:hover { color: var(--accent-color); }
+
+        #controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .btn {
+            background-color: #21262d;
+            color: var(--text-color);
+            border: 1px solid #30363d;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .btn:hover {
+            background-color: #30363d;
+            border-color: #8b949e;
+        }
+        .btn.active {
+            background-color: var(--accent-color);
+            color: #fff;
+            border-color: var(--accent-color);
+        }
+
+        #canvas-container {
+            position: relative;
+            flex-grow: 1;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        canvas {
+            background-color: var(--bg-color);
+            display: block;
+            cursor: crosshair;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+        }
+
+        #center-line {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            width: 1px;
+            height: 100%;
+            background-color: rgba(88, 166, 255, 0.3);
+            transform: translateX(-50%);
+            pointer-events: none;
+        }
+
+        #footer {
+            width: 100%;
+            padding: 10px;
+            background-color: var(--ui-color);
+            border-top: 1px solid #30363d;
+            text-align: center;
+            font-size: 12px;
+            color: #8b949e;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="header">
+        <div id="title-area">
+            <h1>MIRROR DRAW</h1>
+            <a href="index.html" id="back-link">← 返回選單</a>
+        </div>
+        <div id="controls">
+            <button class="btn active" id="btn-draw" onclick="setMode('draw')">繪製</button>
+            <button class="btn" id="btn-erase" onclick="setMode('erase')">橡皮擦</button>
+            <button class="btn" onclick="clearCanvas()">清空</button>
+        </div>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="paintCanvas"></canvas>
+        <div id="center-line"></div>
+    </div>
+
+    <div id="footer">
+        在左側繪製，右側將自動產生鏡像圖案。
+    </div>
+
+    <script>
+        const canvas = document.getElementById('paintCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('canvas-container');
+        const btnDraw = document.getElementById('btn-draw');
+        const btnErase = document.getElementById('btn-erase');
+
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+        let currentMode = 'draw';
+        let brushSize = 5;
+        let drawColor = '#58a6ff'; // 繪製顏色
+        let eraseColor = '#0d1117'; // 背景顏色 (橡皮擦)
+
+        function initCanvas() {
+            // 設定畫布大小為容器大小，但保持正方形以利對稱
+            const size = Math.min(container.offsetWidth * 0.95, container.offsetHeight * 0.95, 800);
+            canvas.width = size;
+            canvas.height = size;
+            
+            // 初始化背景
+            ctx.fillStyle = eraseColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 設定筆觸樣式
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            updateBrushSettings();
+        }
+
+        function updateBrushSettings() {
+            ctx.lineWidth = brushSize;
+            ctx.strokeStyle = (currentMode === 'draw') ? drawColor : eraseColor;
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            btnDraw.classList.toggle('active', mode === 'draw');
+            btnErase.classList.toggle('active', mode === 'erase');
+            updateBrushSettings();
+        }
+
+        function clearCanvas() {
+            ctx.fillStyle = eraseColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // --- 核心鏡像繪圖邏輯 ---
+
+        function draw(e) {
+            if (!isDrawing) return;
+
+            // 取得滑鼠或觸控相對於畫布的座標
+            let clientX, clientY;
+            if (e.touches) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+
+            const rect = canvas.getBoundingClientRect();
+            const currX = clientX - rect.left;
+            const currY = clientY - rect.top;
+            
+            const centerX = canvas.width / 2;
+
+            // 限制只能在左半邊繪製 (這是一個設計選擇，讓對稱更有趣)
+            // if (currX > centerX) return;
+
+            // 1. 繪製原本的線條
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(currX, currY);
+            ctx.stroke();
+
+            // 2. 繪製鏡像的線條
+            // 計算鏡像座標：x' = centerX + (centerX - x) = 2 * centerX - x
+            const mirrorLastX = 2 * centerX - lastX;
+            const mirrorCurrX = 2 * centerX - currX;
+
+            ctx.beginPath();
+            ctx.moveTo(mirrorLastX, lastY);
+            ctx.lineTo(mirrorCurrX, currY);
+            ctx.stroke();
+
+            // 更新上一次的座標
+            lastX = currX;
+            lastY = currY;
+        }
+
+        function startDrawing(e) {
+            isDrawing = true;
+            
+            let clientX, clientY;
+            if (e.touches) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+
+            const rect = canvas.getBoundingClientRect();
+            lastX = clientX - rect.left;
+            lastY = clientY - rect.top;
+        }
+
+        function stopDrawing() {
+            isDrawing = false;
+            ctx.beginPath(); // 重設路徑，防止線條連接
+        }
+
+        // --- 事件監聽 ---
+
+        // 滑鼠事件
+        canvas.addEventListener('mousedown', startDrawing);
+        window.addEventListener('mousemove', draw);
+        window.addEventListener('mouseup', stopDrawing);
+
+        // 觸控事件 (支援行動裝置)
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // 防止螢幕捲動
+            startDrawing(e);
+        });
+        window.addEventListener('touchmove', (e) => {
+            if (isDrawing) e.preventDefault();
+            draw(e);
+        }, { passive: false });
+        window.addEventListener('touchend', stopDrawing);
+
+        // 視窗大小改變時重新初始化 (警告：這會清空畫布)
+        window.addEventListener('resize', initCanvas);
+
+        // 初始載入
+        initCanvas();
+
+    </script>
+</body>
+</html>

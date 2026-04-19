@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>23.html - Dodge Rain</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background:
+                radial-gradient(circle at top, #1f6feb 0%, #0d1117 38%, #050816 100%);
+            color: #ffffff;
+            font-family: "Microsoft JhengHei", "Segoe UI", sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        canvas {
+            display: block;
+            background:
+                linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01)),
+                #0b1220;
+            border: 2px solid #30363d;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+        }
+
+        #hud {
+            position: absolute;
+            top: 18px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 18px;
+            padding: 10px 16px;
+            border-radius: 999px;
+            background: rgba(13, 17, 23, 0.72);
+            backdrop-filter: blur(8px);
+            font-size: 16px;
+            z-index: 5;
+        }
+
+        #overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 24px;
+            background: rgba(5, 8, 22, 0.82);
+            z-index: 10;
+        }
+
+        h1 {
+            margin: 0 0 10px;
+            font-size: 34px;
+            letter-spacing: 1px;
+        }
+
+        p {
+            margin: 0 0 22px;
+            line-height: 1.7;
+            color: #c9d1d9;
+            max-width: 340px;
+        }
+
+        .btn {
+            border: none;
+            border-radius: 999px;
+            padding: 12px 28px;
+            font-size: 17px;
+            font-weight: 700;
+            color: #ffffff;
+            background: linear-gradient(135deg, #2ea043, #238636);
+            cursor: pointer;
+            transition: transform 0.15s ease, filter 0.15s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            filter: brightness(1.08);
+        }
+
+        .back {
+            position: absolute;
+            bottom: 26px;
+            color: #8b949e;
+            text-decoration: none;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div id="hud">
+        <div id="score">分數：0</div>
+        <div id="best">最高：0</div>
+        <div id="speed">速度：1</div>
+    </div>
+
+    <canvas id="game"></canvas>
+
+    <div id="overlay">
+        <h1 id="title">DODGE RAIN</h1>
+        <p id="message">左右移動藍色方塊，閃避從上方掉落的紅色障礙物。撐得越久，速度越快。</p>
+        <button class="btn" id="startBtn">開始遊戲</button>
+        <a class="back" href="index.html">返回首頁</a>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("game");
+        const ctx = canvas.getContext("2d");
+        const scoreEl = document.getElementById("score");
+        const bestEl = document.getElementById("best");
+        const speedEl = document.getElementById("speed");
+        const overlay = document.getElementById("overlay");
+        const titleEl = document.getElementById("title");
+        const messageEl = document.getElementById("message");
+        const startBtn = document.getElementById("startBtn");
+
+        const state = {
+            running: false,
+            score: 0,
+            best: Number(localStorage.getItem("game23-best") || 0),
+            speedLevel: 1,
+            player: { x: 0, y: 0, w: 44, h: 44, speed: 7 },
+            obstacles: [],
+            spawnTimer: 0,
+            moveLeft: false,
+            moveRight: false,
+            lastTime: 0
+        };
+
+        function resize() {
+            canvas.width = Math.min(window.innerWidth - 20, 420);
+            canvas.height = Math.min(window.innerHeight - 20, 720);
+            state.player.y = canvas.height - 74;
+            if (!state.running) {
+                state.player.x = canvas.width / 2 - state.player.w / 2;
+                draw();
+            }
+        }
+
+        function resetGame() {
+            state.score = 0;
+            state.speedLevel = 1;
+            state.obstacles = [];
+            state.spawnTimer = 0;
+            state.player.x = canvas.width / 2 - state.player.w / 2;
+            updateHud();
+        }
+
+        function startGame() {
+            resetGame();
+            state.running = true;
+            state.lastTime = performance.now();
+            overlay.style.display = "none";
+            requestAnimationFrame(loop);
+        }
+
+        function endGame() {
+            state.running = false;
+            if (state.score > state.best) {
+                state.best = state.score;
+                localStorage.setItem("game23-best", String(state.best));
+            }
+            updateHud();
+            titleEl.textContent = "遊戲結束";
+            messageEl.textContent = `本次分數：${state.score}。再試一次，挑戰更高分。`;
+            startBtn.textContent = "重新開始";
+            overlay.style.display = "flex";
+        }
+
+        function updateHud() {
+            scoreEl.textContent = `分數：${state.score}`;
+            bestEl.textContent = `最高：${state.best}`;
+            speedEl.textContent = `速度：${state.speedLevel}`;
+        }
+
+        function spawnObstacle() {
+            const size = 22 + Math.random() * 26;
+            state.obstacles.push({
+                x: Math.random() * (canvas.width - size),
+                y: -size,
+                w: size,
+                h: size,
+                speed: 3 + state.speedLevel * 0.9 + Math.random() * 1.4
+            });
+        }
+
+        function update(delta) {
+            if (state.moveLeft) {
+                state.player.x -= state.player.speed;
+            }
+            if (state.moveRight) {
+                state.player.x += state.player.speed;
+            }
+
+            state.player.x = Math.max(0, Math.min(canvas.width - state.player.w, state.player.x));
+
+            state.spawnTimer += delta;
+            const spawnGap = Math.max(240, 700 - state.speedLevel * 45);
+            if (state.spawnTimer >= spawnGap) {
+                state.spawnTimer = 0;
+                spawnObstacle();
+            }
+
+            for (let i = state.obstacles.length - 1; i >= 0; i--) {
+                const obstacle = state.obstacles[i];
+                obstacle.y += obstacle.speed;
+
+                if (isHit(state.player, obstacle)) {
+                    endGame();
+                    return;
+                }
+
+                if (obstacle.y > canvas.height) {
+                    state.obstacles.splice(i, 1);
+                    state.score += 1;
+                    state.speedLevel = 1 + Math.floor(state.score / 8);
+                    updateHud();
+                }
+            }
+        }
+
+        function isHit(a, b) {
+            return (
+                a.x < b.x + b.w &&
+                a.x + a.w > b.x &&
+                a.y < b.y + b.h &&
+                a.y + a.h > b.y
+            );
+        }
+
+        function drawPlayer() {
+            ctx.fillStyle = "#58a6ff";
+            ctx.fillRect(state.player.x, state.player.y, state.player.w, state.player.h);
+            ctx.fillStyle = "#dbeafe";
+            ctx.fillRect(state.player.x + 9, state.player.y + 8, 8, 8);
+            ctx.fillRect(state.player.x + 27, state.player.y + 8, 8, 8);
+        }
+
+        function drawObstacles() {
+            state.obstacles.forEach((obstacle) => {
+                ctx.fillStyle = "#ff7b72";
+                ctx.fillRect(obstacle.x, obstacle.y, obstacle.w, obstacle.h);
+            });
+        }
+
+        function drawBackground() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, "#111827");
+            gradient.addColorStop(1, "#071019");
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = "rgba(255,255,255,0.05)";
+            for (let y = 20; y < canvas.height; y += 40) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+        }
+
+        function draw() {
+            drawBackground();
+            drawObstacles();
+            drawPlayer();
+        }
+
+        function loop(timestamp) {
+            if (!state.running) {
+                return;
+            }
+
+            const delta = timestamp - state.lastTime;
+            state.lastTime = timestamp;
+
+            update(delta);
+            draw();
+
+            if (state.running) {
+                requestAnimationFrame(loop);
+            }
+        }
+
+        function setMoveFromPointer(clientX) {
+            const rect = canvas.getBoundingClientRect();
+            const x = clientX - rect.left;
+            const playerCenter = state.player.x + state.player.w / 2;
+            state.moveLeft = x < playerCenter - 8;
+            state.moveRight = x > playerCenter + 8;
+        }
+
+        window.addEventListener("keydown", (event) => {
+            if (event.key === "ArrowLeft" || event.key.toLowerCase() === "a") {
+                state.moveLeft = true;
+            }
+            if (event.key === "ArrowRight" || event.key.toLowerCase() === "d") {
+                state.moveRight = true;
+            }
+            if (event.key === " " && !state.running) {
+                startGame();
+            }
+        });
+
+        window.addEventListener("keyup", (event) => {
+            if (event.key === "ArrowLeft" || event.key.toLowerCase() === "a") {
+                state.moveLeft = false;
+            }
+            if (event.key === "ArrowRight" || event.key.toLowerCase() === "d") {
+                state.moveRight = false;
+            }
+        });
+
+        canvas.addEventListener("mousemove", (event) => {
+            if (state.running) {
+                setMoveFromPointer(event.clientX);
+            }
+        });
+
+        canvas.addEventListener("mouseleave", () => {
+            state.moveLeft = false;
+            state.moveRight = false;
+        });
+
+        canvas.addEventListener("touchstart", (event) => {
+            event.preventDefault();
+            if (!state.running) {
+                startGame();
+                return;
+            }
+            setMoveFromPointer(event.touches[0].clientX);
+        }, { passive: false });
+
+        canvas.addEventListener("touchmove", (event) => {
+            event.preventDefault();
+            if (state.running) {
+                setMoveFromPointer(event.touches[0].clientX);
+            }
+        }, { passive: false });
+
+        canvas.addEventListener("touchend", () => {
+            state.moveLeft = false;
+            state.moveRight = false;
+        });
+
+        startBtn.addEventListener("click", startGame);
+        window.addEventListener("resize", resize);
+
+        bestEl.textContent = `最高：${state.best}`;
+        resize();
+        draw();
+    </script>
+</body>
+</html>

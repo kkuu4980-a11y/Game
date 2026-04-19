@@ -1,0 +1,224 @@
+
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>方塊之塔 - Block Tower</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #0d1117;
+            color: #ffffff;
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        #ui {
+            position: absolute;
+            top: 20px;
+            text-align: center;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        #score {
+            font-size: 32px;
+            font-weight: bold;
+            color: #58a6ff;
+        }
+
+        canvas {
+            background: linear-gradient(to bottom, #0b0e14 0%, #161b22 100%);
+            display: block;
+        }
+
+        #overlay {
+            position: absolute;
+            background: rgba(13, 17, 23, 0.9);
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+        }
+
+        .btn {
+            background: #238636;
+            color: white;
+            border: none;
+            padding: 12px 40px;
+            font-size: 18px;
+            cursor: pointer;
+            border-radius: 6px;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        .btn:hover { background: #2ea043; }
+
+        h1 { margin-bottom: 10px; color: #f0f6fc; }
+        p { margin-bottom: 30px; color: #8b949e; text-align: center; padding: 0 20px; }
+
+        .back {
+            position: absolute;
+            bottom: 30px;
+            color: #8b949e;
+            text-decoration: none;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        <div id="score">高度: 0m</div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="overlay">
+        <h1 id="m-title">BLOCK TOWER</h1>
+        <p id="m-desc">點擊畫面釋放方塊，堆疊出最高的建築！<br>小心重心偏移導致崩塌。</p>
+        <button class="btn" onclick="start()">開始建造</button>
+        <a href="index.html" class="back">← 返回主選單</a>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const overlay = document.getElementById('overlay');
+        const mTitle = document.getElementById('m-title');
+        const mDesc = document.getElementById('m-desc');
+
+        let isRunning = false;
+        let blocks = [];
+        let currentBlock = { x: 0, w: 50, h: 30, speed: 4 };
+        let cameraY = 0;
+        let score = 0;
+        let groundY;
+
+        function init() {
+            canvas.width = window.innerWidth > 500 ? 400 : window.innerWidth;
+            canvas.height = window.innerHeight;
+            groundY = canvas.height - 50;
+            currentBlock.x = 0;
+        }
+
+        window.addEventListener('resize', init);
+
+        function start() {
+            blocks = [];
+            score = 0;
+            cameraY = 0;
+            isRunning = true;
+            scoreEl.innerText = `高度: 0m`;
+            overlay.style.display = 'none';
+            // 初始地基
+            blocks.push({ x: canvas.width / 2 - 50, y: groundY, w: 100, h: 40, color: '#30363d' });
+            spawnNewBlock();
+            animate();
+        }
+
+        function spawnNewBlock() {
+            const prevBlock = blocks[blocks.length - 1];
+            currentBlock = {
+                x: 0,
+                y: prevBlock.y - 30,
+                w: prevBlock.w, // 難度：方塊寬度繼承上一個
+                h: 30,
+                speed: 3 + (score * 0.2),
+                direction: 1,
+                color: `hsl(${(score * 20) % 360}, 60%, 60%)`
+            };
+        }
+
+        function dropBlock() {
+            if (!isRunning) return;
+
+            const prev = blocks[blocks.length - 1];
+            const overlap = Math.min(currentBlock.x + currentBlock.w, prev.x + prev.w) - Math.max(currentBlock.x, prev.x);
+
+            if (overlap <= 0) {
+                gameOver();
+                return;
+            }
+
+            // 裁切方塊 (只保留重疊部分)
+            const newX = Math.max(currentBlock.x, prev.x);
+            const newW = overlap;
+            
+            blocks.push({
+                x: newX,
+                y: currentBlock.y,
+                w: newW,
+                h: currentBlock.h,
+                color: currentBlock.color
+            });
+
+            score++;
+            scoreEl.innerText = `高度: ${score}m`;
+            
+            // 攝影機隨高度上移
+            if (blocks.length > 5) {
+                cameraY += 30;
+            }
+
+            spawnNewBlock();
+        }
+
+        function gameOver() {
+            isRunning = false;
+            overlay.style.display = 'flex';
+            mTitle.innerText = "塔崩塌了！";
+            mTitle.style.color = "#ff7b72";
+            mDesc.innerText = `這座塔達到了 ${score} 公尺的高度。`;
+        }
+
+        window.addEventListener('mousedown', (e) => { if(e.button === 0) dropBlock(); });
+        window.addEventListener('touchstart', (e) => { e.preventDefault(); dropBlock(); }, {passive: false});
+
+        function animate() {
+            if (!isRunning) return;
+            requestAnimationFrame(animate);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            ctx.translate(0, cameraY);
+
+            // 畫地板
+            ctx.fillStyle = '#161b22';
+            ctx.fillRect(0, groundY + 40, canvas.width, 500);
+
+            // 畫已落下的方塊
+            blocks.forEach(b => {
+                ctx.fillStyle = b.color;
+                ctx.fillRect(b.x, b.y, b.w, b.h);
+                ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+                ctx.strokeRect(b.x, b.y, b.w, b.h);
+            });
+
+            // 更新並畫當前移動方塊
+            currentBlock.x += currentBlock.speed * currentBlock.direction;
+            if (currentBlock.x + currentBlock.w > canvas.width || currentBlock.x < 0) {
+                currentBlock.direction *= -1;
+            }
+
+            ctx.fillStyle = currentBlock.color;
+            ctx.fillRect(currentBlock.x, currentBlock.y, currentBlock.w, currentBlock.h);
+            
+            ctx.restore();
+        }
+
+        init();
+    </script>
+</body>
+</html>
